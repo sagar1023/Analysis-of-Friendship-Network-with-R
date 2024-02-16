@@ -1,0 +1,270 @@
+---
+title: "Final Project"
+author: "Sagar Rijhwani"
+date: "2023-12-03"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=TRUE}
+#Load the data and library
+setwd("C:/Users/SAGAR/OneDrive/Desktop/Sagar/NCSU/MEM/DSC 595")
+
+load("C:/Users/SAGAR/OneDrive/Desktop/Sagar/NCSU/MEM/DSC 595/wiring.rda")
+
+library(igraph)
+
+#Details of the rdpos graph object
+rdpos
+
+#Plot the graph 
+par(mar=c(2,2,2,2))
+plot(rdpos,
+     main = "ROETHLISBERGER & DICKSON BANK WIRING ROOM VISUALIZATION")
+
+#The names of the vertices (nodes) in the rdpos
+V(rdpos)$name
+
+#Define Fruchterman-Reingold layout
+fr_layout <- layout_with_fr(rdpos)
+
+# Define basic colors for the three groups
+colors <- setNames(c("red", "green", "blue"), c("I", "S", "W"))
+
+# Assign colors to nodes based on their type (I, S, W)
+node_colors <- sapply(V(rdpos)$name, function(name) colors[substr(name, 1, 1)])
+
+#Define labels as the name of the nodes
+labels = V(rdpos)$name
+
+#Define edge curvature
+curved <- 0.2
+
+# Set plotting margin
+par(mar = c(2,2,2,2))
+
+# Plot the graph with node labels using defined parameters
+plot(rdpos,
+     layout = fr_layout,
+     vertex.label = labels,
+     vertex.color = node_colors,
+     edge.curved = curved,
+     main = "ROETHLISBERGER & DICKSON BANK WIRING ROOM VISUALIZATION"
+)
+
+# Add a legend
+legend("bottomright",
+       legend = c("Inspector", "Solderer", "Wireman/Assembler"),
+       col = c("red", "green", "blue"),
+       pt.cex = 1.5,
+       pch = 21, 
+       bty = "n",
+       title = "Categories")
+
+#Interactive Graph for ROETHLISBERGER & DICKSON BANK WIRING ROOM Network:
+
+library(visNetwork)
+
+V(rdpos)$name
+
+# Create a nodes data frame
+nodes <- data.frame(id = 1:vcount(rdpos), label = V(rdpos)$name)
+
+# Create an edges data frame
+# Extract edges from the igraph object and map names to IDs
+edges <- get.data.frame(rdpos, what = "edges")
+edges$from <- match(edges$from, nodes$label)
+edges$to <- match(edges$to, nodes$label)
+
+edges
+
+# Create the network visualization
+visNetwork(nodes, edges) %>%
+  visNodes(color = "PURPLE", shape= "diamond") %>%
+  visEdges(smooth = TRUE) %>%
+  visOptions(highlightNearest = TRUE, nodesIdSelection = TRUE)
+
+##Compute centrality scores:
+#1.Degree centrality
+deg <- degree(rdpos)
+deg
+#2. Closeness centrality
+close <- closeness(rdpos)
+close
+#3. Betweenness centrality
+bet <- betweenness(rdpos)
+bet
+#4. Eigenvector centrality
+eigens_vec<- eigen_centrality(rdpos, scale = FALSE)
+eigens_vec$vector
+
+# Centralization with isolates
+centr_eigen(rdpos, directed=FALSE)$centralization
+
+# Remove isolates from rdpos
+rdpos_without_isolates <- delete.vertices(rdpos, V(rdpos)[degree(rdpos) == 0])
+
+# Centralization without isolates
+centr_eigen(rdpos_without_isolates, directed=FALSE)$centralization
+
+
+# Define the colors for each group
+colors <- c("I" = "purple", "S" = "blue", "W" = "yellow")
+
+# Assign colors to nodes based on their type (I, S, W)
+node_colors <- ifelse(grepl("^I", V(rdpos_without_isolates)$name), "purple",
+                      ifelse(grepl("^S", V(rdpos_without_isolates)$name), "blue", "yellow"))
+
+#Plot without 
+plot(rdpos_without_isolates,
+     vertex.color = node_colors,
+     main = "ROETHLISBERGER & DICKSON BANK WIRING ROOM VISUALIZATION"
+)
+```
+
+Results:
+
+Degree centrality: It tells you how many connections (edges) each node (person) has in the network.In this case, W3 and S1 each with 4 connections are among the most connected in this network. It suggest strong social engagement or popularity within the group.
+
+Closeness centrality: Nodes with higher closeness centrality scores can be considered more central in the network in terms of distance.They are, on average, closer to all other nodes, which might suggest they can spread information more quickly or have faster access to information from others.The closeness centrality of S1 is 0.07692308, which is relatively high, indicating that S1 is, on average, closer to all other nodes in the network
+
+Betweenness centrality:It measures the number of times a node acts as a bridge along the shortest path between two other nodes. Nodes like W3 (score of 7), W7 (score of 15), and S1 (score of 16) have higher betweenness centrality, indicating they frequently occur on shortest paths between other nodes and may play a role in connecting different parts of the network.
+
+Eigenvector centrality: It reflects the influence of a node in a network. It assigns relative scores to all nodes in the network based on the principle that connections to high-scoring nodes contribute more to the score of the node in question than equal connections to low-scoring nodes.These values are normalized in the range [0,1], with higher values indicating greater influence or connectivity in the network context.W3 has a high score (approximately 0.4724232), suggesting it's well-connected or influential within the network.
+
+Centralization with isolates: The score 0.72090690,indicates the centralization level. A score closer to 1 suggests that the network's structure is highly centralized. 
+
+Centralization without isolates: The new centralization score is 0.5215546. This score is lower than the one calculated with isolates, indicating that the removal of isolated nodes has made the network less centralized.
+
+The decrease in centralization upon removing isolates suggests that the isolated nodes contributed to the centralization of the original network. Their presence may have accentuated the dominance of certain central nodes.
+
+```{r Part B, include=TRUE}
+#Finding Largest Cliques:
+largest_cliques(rdpos_without_isolates)
+
+#Data Frame of Largest Cliques:
+cliques <- as.data.frame(largest_cliques(rdpos_without_isolates))
+cliques
+
+#Computing Coreness:
+coreness <- graph.coreness(rdpos_without_isolates)
+coreness
+
+#Calculates the modularity:
+# Create a numerical membership vector based on the first letter of node names
+# Assign '1' for inspectors (I), '2' for solderers (S), and '3' for wiremen/assemblers (W)
+membership <- sapply(V(rdpos_without_isolates)$name, function(name) {
+  if (substr(name, 1, 1) == "I") {
+    return(1)
+  } else if (substr(name, 1, 1) == "S") {
+    return(2)
+  } else if (substr(name, 1, 1) == "W") {
+    return(3)
+  } else {
+    return(NA) # For nodes that do not start with I, S, or W
+  }
+})
+
+# Ensure membership is a numeric vector
+membership <- as.numeric(membership)
+membership
+
+mod <- modularity(rdpos_without_isolates, membership)
+mod
+
+#Calculate assortativity coefficient for 'name'
+assortativity_nominal(
+  rdpos_without_isolates, 
+  as.integer(as.factor(V(rdpos_without_isolates)$name)))
+```
+Largest Cliques: The largest cliques represent tightly knit groups where every member is connected to every other member. The output shows one of the largest cliques in the graph consisting of nodes S1, W1, W4, and W3. Each of these nodes is connected to all the others in this subgraph.
+
+Coreness: Nodes with higher coreness values are part of more densely interconnected regions of the graph. The output shows that W1, W3, W4, and S1, all have a coreness of 3, indicating they are part of a subgraph where each node has at least 3 connections within that subgraph.
+
+Modularity: The modularity score here is -0.1272189.A negative modularity score suggests that the divisions of the network into the specified groups (based on the first letter of the names) do not reflect strong community structures. In other words, the network is no more divided into these groups than would be expected by chance.
+
+Assortativity:The assortativity coefficient measures the tendency of nodes to connect to other nodes that are similar in some way, in this case, by name. The output is -0.1380471.
+
+Similar to modularity, a negative assortativity coefficient suggests that nodes do not preferentially connect to other nodes with similar names. It indicates that there is no strong tendency for nodes with similar names (or similar first letters, as the case may be) to be connected in this network.
+
+```{r Part C, echo=TRUE}
+# Ensure the necessary libraries are loaded
+library(igraph)
+library(ggraph)
+library(ggplot2)
+
+#Performs the Louvain community detection on the rdpos network 
+louvain_comm <- cluster_louvain(rdpos_without_isolates)
+louvain_comm
+
+# Get community memberships from the Louvain community detection result
+communities <- membership(louvain_comm)
+communities
+
+# Assign these memberships to the vertices of your graph
+V(rdpos_without_isolates)$louvain_community <- communities
+V(rdpos_without_isolates)$louvain_community
+
+vertex.attributes(rdpos_without_isolates)
+
+# Plot the network
+set.seed(123)
+
+ggraph(rdpos_without_isolates, layout = "fr") +
+  geom_edge_link(color = "grey", alpha = 0.7) +
+  geom_node_point(aes(color = as.factor(louvain_community)), size = 5) +
+  geom_node_text(aes(label = name), vjust = 1.5, size = 3) +
+  labs(title = "ROETHLISBERGER & DICKSON BANK WIRING ROOM Network") +
+  theme_minimal()
+
+
+# Load necessary libraries
+library(igraph)
+library(blockmodeling)
+
+# Set a seed value to ensure reproducibility
+set.seed(54321)
+
+# Get adjacency matrix from the igraph object 'rdpos_without_isolates'
+mat <- as.matrix(get.adjacency(rdpos_without_isolates))
+
+# Estimate blockmodel partitions with k = 6 using the optRandomParC command
+class6 <- optRandomParC(M=mat, k=6, rep=10, approach="ss", blocks="com")
+class6
+
+# Retrieve the best partition from the blockmodeling result
+best_partition <- class6$best$best1$clu
+best_partition
+
+# Assign the block designations to the igraph object 'rdpos'
+V(rdpos_without_isolates)$block <- best_partition
+V(rdpos_without_isolates)$block
+
+# Plot the graph with vertices colored by their block designation
+par(mar=c(1,1,1,1), mfrow=c(1,1))
+plot(rdpos_without_isolates,
+     vertex.label=NA,  
+     vertex.size=5,  
+     edge.arrow.size=.5,  
+     vertex.color=V(rdpos_without_isolates)$block,  
+     main="Rdpos Friendship Graph with Blockmodel Partitions k=6") 
+```
+
+Block modeling groups are determined by structural equivalence. In block modeling, nodes are grouped together if they have similar patterns of connections or relationships with other nodes, regardless of the actual number of connections. The goal is to simplify the network into blocks of nodes that are structurally replaceable within the network. 
+
+Community detection groups, like those found through the Louvain method, are formed based on modularity optimization. Modularity measures the density of links inside communities as compared to links between communities. It's a way of identifying the division of a network into communities where the nodes within a given community have more connections to each other than to nodes in other communities.
+
+In practice, block modeling might group together two individuals who both have strong connections to the same third party (even if they don't have a direct connection), while community detection would group together individuals who frequently interact with each other directly. 
+
+Overall, Block modeling groups nodes based on their roles and patterns of connections within a network, aiming to identify structurally equivalent nodes. Community detection, such as the Louvain method, groups nodes based on the density of connections, clustering together those that have more interactions with each other. Block modeling focuses on network roles, while community detection emphasizes connection strength.
+
+Conclusion:
+The network's structure is straightforward with a few key players and groups that have significant roles and influence. It's like a community with some members being more central than others, helping to connect different groups and keep information flowing. The study highlighted these key parts and made it easier to understand how individuals within this network interact and relate to each other. 
+It pinpointed pivotal nodes like W3 and S1 that are integral to the network’s information and relationship fabric. Detailed assessments using centrality metrics uncovered the layers of influence and interaction among individuals. Analysis tools such as clique identification, coreness, and modularity illuminated the cohesive subgroups and their interconnections.
+Overall, it's an organized system with clear patterns of connection rather than a tangled web of complexity.
+
+
+
+
+
